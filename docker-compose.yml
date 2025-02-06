@@ -1,0 +1,72 @@
+version: '3.8'
+name: waner-on
+services:
+  postgres:
+    image: bitnami/postgresql
+    container_name: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRESQL_PASSWORD: 123456
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  identity:
+    image: identity
+    container_name: identity
+    build: ./packages/identity
+    restart: always
+    ports:
+      - 3030:3030
+    environment:
+      NODE_ENV: production
+      PORT: 3030
+      DATABASE_URL: postgresql://postgres:123456@postgres:5432/identity?schema=public
+      JWT_SECRET: MjA2ZjQzMzctYWI4NS00YmE4LTk5MzQtNzdiYmZhYWE4YTIy 
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 0.8G
+
+  pricing:
+    image: pricing
+    build: ./packages/pricing
+    restart: always
+    expose: 
+      - 3000
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:123456@postgres:5432/pricing?schema=public
+      JWT_SECRET: MjA2ZjQzMzctYWI4NS00YmE4LTk5MzQtNzdiYmZhYWE4YTIy
+    depends_on:
+      - postgres
+    deploy:
+      mode: replicated
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  nginx-pricing:
+    container_name: nginx-pricing
+    image: nginx:latest
+    volumes:
+      - ./packages/pricing/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - pricing
+    ports:
+      - 3000:3000
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 0.2G
